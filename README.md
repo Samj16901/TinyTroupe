@@ -476,7 +476,7 @@ The `config.ini` file contains various parameters that can be used to customize 
 
 ## Command-Line Interface (CLI) Tool
 
-This repository includes a basic command-line tool, `run_chat_cli.py`, located in the `examples` directory, to quickly run chat simulations between two agents without needing to write Python code directly.
+This repository includes a basic command-line tool, `run_chat_cli.py`, located in the `examples` directory, to quickly run chat simulations between two agents without needing to write Python code directly. The `examples/agents/` directory contains a diverse set of personas, including professionals, college students, and other characters, offering a range of scenarios for simulation.
 
 ### Usage
 
