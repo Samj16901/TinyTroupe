@@ -21,7 +21,173 @@ from rich import print
 #######################################################################################################################
 @utils.post_init
 class TinyPerson(JsonSerializableRegistry):
-    """A simulated person in the TinyTroupe universe."""
+    """
+    A simulated person in the TinyTroupe universe.
+
+    This class represents an agent with a persona, mental state, memory, and mental faculties.
+    Agents can perceive stimuli, act in an environment, and interact with other agents.
+
+    :param name: The name of the TinyPerson.
+    :type name: str
+    :param episodic_memory: The agent's episodic memory. Defaults to a new :class:`~tinytroupe.agent.memory.EpisodicMemory` instance.
+    :type episodic_memory: EpisodicMemory, optional
+    :param semantic_memory: The agent's semantic memory. Defaults to a new :class:`~tinytroupe.agent.memory.SemanticMemory` instance.
+    :type semantic_memory: SemanticMemory, optional
+    :param mental_faculties: A list of mental faculties that define the agent's capabilities. Defaults to an empty list.
+    :type mental_faculties: list, optional
+
+    **Core Attributes:**
+
+    *   ``name (str)``: The name of the TinyPerson.
+    *   ``episodic_memory (EpisodicMemory)``: Stores time-ordered sequences of events and experiences.
+    *   ``semantic_memory (SemanticMemory)``: Stores general knowledge, facts, and concepts.
+    *   ``_mental_faculties (list)``: A list of :class:`~tinytroupe.agent.mental_faculty.MentalFaculty` instances that define the agent's capabilities for action and perception processing.
+    *   ``_persona (dict)``: A dictionary containing the agent's defining characteristics such as age, occupation, personality traits, interests, and skills.
+    *   ``_mental_state (dict)``: A dictionary representing the agent's current internal state, including current datetime, location, ongoing goals, focus of attention, emotions, and accessible agents.
+
+    **Key Methods:**
+
+    *   **Persona Management**: :meth:`~define`, :meth:`~get`, :meth:`~import_fragment`, :meth:`~include_persona_definitions`.
+    *   **Action and Perception**: :meth:`~act`, :meth:`~listen`, :meth:`~see`, :meth:`~think`.
+    *   **Memory Interaction**: :meth:`~store_in_memory`, :meth:`~retrieve_memories`, :meth:`~retrieve_recent_memories`, :meth:`~retrieve_relevant_memories`.
+    *   **State Management**: :meth:`~move_to`, :meth:`~change_context`, :meth:`~make_agent_accessible`.
+    *   **Serialization**: :meth:`~save_specification`, :meth:`~load_specification`.
+
+    **Basic Usage Example:**
+
+    Creating a new TinyPerson and defining some persona attributes:
+    Creating a new TinyPerson and defining some persona attributes:
+
+    .. code-block:: python
+
+        from tinytroupe.agent import TinyPerson
+
+        # Create a new agent named Alice
+        alice = TinyPerson(name="Alice")
+
+        # Define Alice's age and occupation
+        alice.define("age", 30)
+        alice.define("occupation", {"title": "Software Engineer", "company": "Tech Solutions Inc."})
+        alice.define("personal_interests", ["hiking", "reading sci-fi novels"])
+
+        # Display Alice's mini biography
+        print(alice.minibio())
+        # Output might be: Alice is a 30 year old Software Engineer, None, currently living in None. ... (extended bio)
+
+        # Alice perceives a visual stimulus
+        alice.see("A small, curious robot rolls into the room.")
+
+        # Alice decides to act
+        actions = alice.act(return_actions=True)
+        for action in actions:
+            print(f"Alice's action: {action['action']['type']} - {action['action'].get('content', '')}")
+
+    Loading a TinyPerson from a specification file:
+
+    .. code-block:: python
+
+        from tinytroupe.agent import TinyPerson
+
+        # Assume "examples/agents/Alice.agent.json" exists and is a valid agent specification file.
+        # This path might vary based on your project structure.
+        try:
+            bob = TinyPerson.load_specification("examples/agents/Bob.agent.json") # Fictional agent for example
+            print(f"Loaded {bob.name} successfully.")
+        except FileNotFoundError:
+            print("Bob's agent file not found. Please create it or use an existing one.")
+        except Exception as e:
+            print(f"Error loading Bob: {e}")
+
+
+    **Agent Specification Files (JSON):**
+
+    Agent specification files are JSON documents that define the persona, memory, and mental faculties of a TinyPerson.
+    This allows for easy persistence and sharing of agent configurations.
+
+    **Structure:**
+
+    The root of the JSON object should have a ``"type": "TinyPerson"`` field.
+    Key components include:
+
+    *   ``"persona"``: An object detailing the agent's characteristics.
+        *   ``"name"``: (str) The agent's name.
+        *   ``"age"``: (int) Age in years.
+        *   ``"nationality"``: (str) Agent's nationality.
+        *   ``"country_of_residence"``: (str) Current country of residence.
+        *   ``"occupation"``: (object) Details about the agent's job.
+            *   ``"title"``: (str) Job title.
+            *   ``"description"``: (str, optional) Brief description of the occupation.
+        *   ``"personality_traits"``: (list of str) e.g., "Creative", "Introverted".
+        *   ``"personal_interests"``: (list of str) e.g., "Reading", "Hiking".
+        *   ``"skills"``: (list of str) e.g., "Writing", "Programming".
+        *   ``"relationships"``: (list of objects) Describes connections to other agents.
+            *   ``"Name"``: (str) Name of the other agent.
+            *   ``"Description"``: (str) Nature of the relationship (e.g., "colleague", "friend").
+    *   ``"episodic_memory"`` (optional): An object representing the agent's :class:`~tinytroupe.agent.memory.EpisodicMemory`.
+    *   ``"semantic_memory"`` (optional): An object representing the agent's :class:`~tinytroupe.agent.memory.SemanticMemory`.
+    *   ``"mental_faculties"`` (optional): A list of objects, each representing a :class:`~tinytroupe.agent.mental_faculty.MentalFaculty`.
+
+    **Example JSON Specification:**
+
+    .. code-block:: json
+
+        {
+            "type": "TinyPerson",
+            "persona": {
+                "name": "Elena_Vargas",
+                "age": 47,
+                "nationality": "Spanish",
+                "country_of_residence": "Spain",
+                "occupation": {
+                    "title": "Investigative Journalist",
+                    "description": "Uncovers corporate and governmental misconduct."
+                },
+                "personality_traits": ["Cynical", "Determined", "Incorruptible"],
+                "personal_interests": ["Chess", "Classic literature"],
+                "skills": ["Interviewing", "Data analysis", "Writing", "Stealth"]
+            }
+        }
+
+    You can also include ``episodic_memory``, ``semantic_memory``, and ``mental_faculties`` in the specification file if you want to persist these aspects.
+
+    **Fragments:**
+
+    Fragments are partial JSON specifications that can be merged into an existing agent's persona to customize or update it.
+    This is useful for applying common sets of traits or characteristics to multiple agents.
+
+    A fragment file must have ``"type": "Fragment"`` and a ``"persona"`` object.
+
+    **Example Fragment (e.g., `tech_enthusiast.agent.fragment.json`):**
+
+    .. code-block:: json
+
+        {
+            "type": "Fragment",
+            "persona": {
+                "personal_interests": ["Latest gadgets", "AI development", "Virtual reality"],
+                "skills": ["Coding in Python", "Hardware tinkering"]
+            }
+        }
+
+    **Importing a Fragment:**
+
+    .. code-block:: python
+
+        from tinytroupe.agent import TinyPerson
+        # Assuming 'alice' is an existing TinyPerson instance
+        # alice = TinyPerson(name="Alice")
+        # alice.define("personal_interests", ["gardening"]) # Initial interest
+
+        # try:
+        #     alice.import_fragment("tech_enthusiast.agent.fragment.json") # Fictional fragment
+        #     print(f"Alice's interests after import: {alice.get('personal_interests')}")
+        #     # Expected: ['gardening', 'Latest gadgets', 'AI development', 'Virtual reality'] (if merge=True is default)
+        # except FileNotFoundError:
+        #     print("Fragment file not found.")
+        # except Exception as e:
+        #     print(f"Error importing fragment: {e}")
+
+    """
 
     # The maximum number of actions that an agent is allowed to perform before DONE.
     # This prevents the agent from acting without ever stopping.
@@ -51,14 +217,20 @@ class TinyPerson(JsonSerializableRegistry):
         """
         Creates a TinyPerson.
 
-        Args:
-            name (str): The name of the TinyPerson. Either this or spec_path must be specified.
-            episodic_memory (EpisodicMemory, optional): The memory implementation to use. Defaults to EpisodicMemory().
-            semantic_memory (SemanticMemory, optional): The memory implementation to use. Defaults to SemanticMemory().
-            mental_faculties (list, optional): A list of mental faculties to add to the agent. Defaults to None.
+        :param name: The name of the TinyPerson. Must be unique if the agent is registered globally.
+        :type name: str
+        :param episodic_memory: The episodic memory implementation to use.
+                                If None, a new :class:`~tinytroupe.agent.memory.EpisodicMemory` instance is created.
+        :type episodic_memory: EpisodicMemory, optional
+        :param semantic_memory: The semantic memory implementation to use.
+                                If None, a new :class:`~tinytroupe.agent.memory.SemanticMemory` instance is created.
+        :type semantic_memory: SemanticMemory, optional
+        :param mental_faculties: A list of mental faculties to add to the agent.
+                                 If None, an empty list is used.
+        :type mental_faculties: list, optional
         """
 
-        # NOTE: default values will be given in the _post_init method, as that's shared by 
+        # NOTE: default values will be given in the _post_init method, as that's shared by
         #       direct initialization as well as via deserialization.
 
         if episodic_memory is not None:
@@ -251,14 +423,59 @@ class TinyPerson(JsonSerializableRegistry):
 
     def get(self, key):
         """
-        Returns the definition of a key in the TinyPerson's configuration.
+        Returns the definition of a key in the TinyPerson's persona.
+
+        :param key: The key to retrieve from the persona.
+        :type key: str
+        :return: The value associated with the key, or None if the key is not found.
+        :rtype: Any
+
+        Example:
+            >>> alice.get("age")
+            30
+            >>> alice.get("non_existent_key")
+            None
         """
         return self._persona.get(key, None)
-    
+
     @transactional
-    def import_fragment(self, path):
+    def import_fragment(self, path: str):
         """
         Imports a fragment of a persona configuration from a JSON file.
+
+        Fragments are JSON files that define a part of an agent's persona.
+        They can be used to customize agents by merging the fragment's definitions
+        with the agent's existing persona. The merge behavior is determined by
+        :func:`~tinytroupe.utils.merge_dicts`. After importing, the agent's
+        internal prompt is reset to reflect the changes.
+
+        :param path: The path to the JSON fragment file.
+        :type path: str
+        :raises ValueError: If the imported JSON file is not a valid fragment (e.g., missing "type": "Fragment" or "persona" key).
+
+        Example:
+            Assuming `artist_fragment.json` contains:
+
+            .. code-block:: json
+
+                {
+                  "type": "Fragment",
+                  "persona": {
+                    "occupation": {"title": "Artist", "medium": "Oil Painting"},
+                    "skills": ["Painting", "Color Theory"]
+                  }
+                }
+
+            .. code-block:: python
+
+                # agent = TinyPerson(name="Carol")
+                # agent.define("occupation", {"title": "Hobbyist"})
+                # agent.import_fragment("artist_fragment.json")
+                # print(agent.get("occupation"))
+                # # Output: {'title': 'Artist', 'medium': 'Oil Painting'}
+                # print(agent.get("skills"))
+                # # Output: ['Painting', 'Color Theory'] (assuming skills wasn't defined before or merge appends)
+
         """
         with open(path, "r") as f:
             fragment = json.load(f)
@@ -275,11 +492,24 @@ class TinyPerson(JsonSerializableRegistry):
     @transactional
     def include_persona_definitions(self, additional_definitions: dict):
         """
-        Imports a set of definitions into the TinyPerson. They will be merged with the current configuration.
-        It is also a convenient way to include multiple bundled definitions into the agent.
+        Includes a set of definitions into the TinyPerson's persona.
 
-        Args:
-            additional_definitions (dict): The additional definitions to import.
+        The provided definitions will be merged with the current persona using
+        :func:`~tinytroupe.utils.merge_dicts`. This is a convenient way to add
+        multiple bundled definitions to the agent at once. After inclusion,
+        the agent's internal prompt is reset.
+
+        :param additional_definitions: A dictionary containing the definitions to import.
+        :type additional_definitions: dict
+
+        Example:
+            >>> definitions = {
+            ...     "personality_traits": ["Outgoing", "Optimistic"],
+            ...     "home_city": "Metropolis"
+            ... }
+            >>> agent.include_persona_definitions(definitions)
+            >>> agent.get("personality_traits") # Assuming it was empty or merged
+            ['Outgoing', 'Optimistic']
         """
 
         self._persona = utils.merge_dicts(self._persona, additional_definitions)
@@ -291,15 +521,45 @@ class TinyPerson(JsonSerializableRegistry):
     @transactional
     def define(self, key, value, merge=True, overwrite_scalars=True):
         """
-        Define a value to the TinyPerson's persona configuration. Value can either be a scalar or a dictionary.
-        If the value is a dictionary or list, you can choose to merge it with the existing value or replace it. 
-        If the value is a scalar, you can choose to overwrite the existing value or not.
+        Define a value in the TinyPerson's persona configuration.
 
-        Args:
-            key (str): The key to define.
-            value (Any): The value to define.
-            merge (bool, optional): Whether to merge the dict/list values with the existing values or replace them. Defaults to True.
-            overwrite_scalars (bool, optional): Whether to overwrite scalar values or not. Defaults to True.
+        The value can be a scalar, dictionary, or list.
+        If the value is a dictionary or list, the `merge` parameter controls whether
+        it's merged with an existing value (using :func:`~tinytroupe.utils.merge_dicts`)
+        or replaces it. For scalar values, `overwrite_scalars` controls behavior if the
+        key already exists. The agent's internal prompt is reset after definition.
+
+        :param key: The key to define in the persona.
+        :type key: str
+        :param value: The value to associate with the key. If a string, it will be dedented.
+        :type value: Any
+        :param merge: Whether to merge dictionary or list values with existing values.
+                      Defaults to True. If False, replaces the existing value.
+        :type merge: bool, optional
+        :param overwrite_scalars: Whether to overwrite existing scalar values.
+                                 Defaults to True. If False and the key exists with a scalar value,
+                                 a ValueError is raised.
+        :type overwrite_scalars: bool, optional
+        :raises ValueError: If `overwrite_scalars` is False and an attempt is made to
+                           overwrite an existing scalar value.
+
+        Example:
+            >>> agent = TinyPerson(name="Dave")
+            >>> agent.define("age", 45)
+            >>> agent.get("age")
+            45
+            >>> agent.define("personal_interests", ["Golf"])
+            >>> agent.get("personal_interests")
+            ['Golf']
+            >>> agent.define("personal_interests", ["Fishing"], merge=True)
+            >>> agent.get("personal_interests")
+            ['Golf', 'Fishing']
+            >>> agent.define("occupation", {"title": "Accountant"}, merge=False)
+            >>> agent.get("occupation")
+            {'title': 'Accountant'}
+            >>> agent.define("occupation", {"department": "Finance"}, merge=True)
+            >>> agent.get("occupation")
+            {'title': 'Accountant', 'department': 'Finance'}
         """
 
         # dedent value if it is a string
@@ -330,12 +590,19 @@ class TinyPerson(JsonSerializableRegistry):
         """
         Defines or updates the TinyPerson's relationships.
 
-        Args:
-            relationships (list or dict): The relationships to add or replace. Either a list of dicts mapping agent names to relationship descriptions,
-              or a single dict mapping one agent name to its relationship description.
-            replace (bool, optional): Whether to replace the current relationships or just add to them. Defaults to True.
+        Relationships are stored in the persona under the "relationships" key, which is a list of dictionaries.
+        Each dictionary should ideally have "Name" (of the other agent) and "Description" (of the relationship) keys.
+
+        :param relationships: The relationships to add or replace.
+                              Can be a list of relationship dictionaries (e.g., `[{"Name": "Bob", "Description": "colleague"}]`)
+                              or a single relationship dictionary (e.g., `{"Name": "Carol", "Description": "sibling"}`).
+        :type relationships: list or dict
+        :param replace: Whether to replace the current list of relationships or add to them.
+                        Defaults to True (replace). If False, new relationships are appended.
+        :type replace: bool, optional
+        :raises Exception: If arguments are invalid (e.g., `replace` is True but `relationships` is not a list for replacement).
         """
-        
+
         if (replace == True) and (isinstance(relationships, list)):
             self._persona['relationships'] = relationships
 
@@ -368,40 +635,62 @@ class TinyPerson(JsonSerializableRegistry):
         """
         Defines a relationship between this agent and another agent.
 
-        Args:
-            other_agent (TinyPerson): The other agent.
-            description (str): The description of the relationship.
-            symmetric (bool): Whether the relationship is symmetric or not. That is, 
-              if the relationship is defined for both agents.
-        
-        Returns:
-            TinyPerson: The agent itself, to facilitate chaining.
+        This is a convenience method that updates the "relationships" list in the persona for both agents
+        if `symmetric_description` is provided.
+
+        :param other_agent: The other agent.
+        :type other_agent: TinyPerson
+        :param description: The description of the relationship from this agent's perspective (e.g., "my boss").
+        :type description: str
+        :param symmetric_description: The description of the relationship from the other agent's perspective
+                                      (e.g., "my subordinate"). If None, only this agent's perspective is recorded.
+                                      Defaults to None.
+        :type symmetric_description: str, optional
+        :return: The agent itself, to facilitate method chaining.
+        :rtype: TinyPerson
         """
         self.define_relationships([{"Name": other_agent.name, "Description": description}], replace=False)
         if symmetric_description is not None:
             other_agent.define_relationships([{"Name": self.name, "Description": symmetric_description}], replace=False)
-        
+
         return self
-    
-    def add_mental_faculties(self, mental_faculties):
+
+    def add_mental_faculties(self, mental_faculties: list):
         """
-        Adds a list of mental faculties to the agent.
+        Adds a list of :class:`~tinytroupe.agent.mental_faculty.MentalFaculty` instances to the agent.
+
+        Each faculty in the list is added using :meth:`~add_mental_faculty`.
+
+        :param mental_faculties: A list of mental faculty objects.
+        :type mental_faculties: list
+        :return: The agent itself, for chaining.
+        :rtype: TinyPerson
         """
         for faculty in mental_faculties:
             self.add_mental_faculty(faculty)
-        
+
         return self
 
     def add_mental_faculty(self, faculty):
         """
-        Adds a mental faculty to the agent.
+        Adds a single :class:`~tinytroupe.agent.mental_faculty.MentalFaculty` to the agent.
+
+        The faculty is appended to the `_mental_faculties` list.
+        The agent's internal prompt is reset after adding a faculty.
+
+        :param faculty: The mental faculty object to add.
+        :type faculty: MentalFaculty
+        :raises Exception: If the faculty is already present in the agent.
+        :return: The agent itself, for chaining.
+        :rtype: TinyPerson
         """
         # check if the faculty is already there or not
         if faculty not in self._mental_faculties:
             self._mental_faculties.append(faculty)
+            self.reset_prompt() # Reset prompt as faculties define actions
         else:
             raise Exception(f"The mental faculty {faculty} is already present in the agent.")
-        
+
         return self
 
     @transactional
@@ -413,14 +702,53 @@ class TinyPerson(JsonSerializableRegistry):
         max_content_length=default["max_content_display_length"],
     ):
         """
-        Acts in the environment and updates its internal cognitive state.
-        Either acts until the agent is done and needs additional stimuli, or acts a fixed number of times,
-        but not both.
+        Prompts the agent to generate and perform a sequence of actions.
 
-        Args:
-            until_done (bool): Whether to keep acting until the agent is done and needs additional stimuli.
-            n (int): The number of actions to perform. Defaults to None.
-            return_actions (bool): Whether to return the actions or not. Defaults to False.
+        The agent's action generation is based on its current persona, mental state, memories,
+        and the available mental faculties. Actions are generated by an LLM based on a
+        system prompt constructed from these elements.
+
+        The agent can either act until it generates a "DONE" action (signifying it has completed
+        its current turn or requires more stimuli) or perform a fixed number of actions.
+        These modes are mutually exclusive.
+
+        Each generated action is stored in episodic memory, and its declared cognitive state
+        (goals, attention, emotions) updates the agent's `_mental_state`.
+        Mental faculties may also process actions for immediate side-effects (e.g., a "SEND_MESSAGE"
+        action processed by a communication faculty).
+
+        :param until_done: If True, the agent acts until a "DONE" action is produced or
+                           `MAX_ACTIONS_BEFORE_DONE` is reached. Defaults to True.
+        :type until_done: bool
+        :param n: Specific number of actions to perform. If provided, `until_done` is ignored.
+                  Must be less than `TinyPerson.MAX_ACTIONS_BEFORE_DONE`. Defaults to None.
+        :type n: int, optional
+        :param return_actions: Whether to return the list of raw action content dictionaries.
+                               Defaults to False.
+        :type return_actions: bool
+        :param max_content_length: Max length for displaying content in communications if `communication_display` is True.
+                                   Defaults to `tinytroupe.agent.default["max_content_display_length"]`.
+        :type max_content_length: int, optional
+        :return: A list of action content dictionaries if `return_actions` is True, otherwise None.
+        :rtype: list, optional
+        :raises AssertionError: If `until_done` is True and `n` is also provided, or if `n` exceeds `MAX_ACTIONS_BEFORE_DONE`.
+
+        Example:
+            >>> # Agent alice sees a message and then acts
+            >>> alice.see("A new message appears on the community board: 'Town meeting tonight at 7 PM.'")
+            >>> actions_taken = alice.act(return_actions=True)
+            >>> if actions_taken:
+            ...     for action_content in actions_taken:
+            ...         action_type = action_content.get("action", {}).get("type")
+            ...         action_details = action_content.get("action", {}).get("content", "")
+            ...         print(f"Alice performed: {action_type} - {action_details}")
+            ...         if action_type == "DONE":
+            ...             print("Alice decided she is done for now.")
+            >>> # Example Output (will vary based on LLM):
+            >>> # Alice performed: REFLECT - I should note this down.
+            >>> # Alice performed: UPDATE_TASK_LIST - Add 'Attend town meeting at 7 PM' to my tasks.
+            >>> # Alice performed: DONE -
+            >>> # Alice decided she is done for now.
         """
 
         # either act until done or act a fixed number of times, but not both
@@ -436,44 +764,57 @@ class TinyPerson(JsonSerializableRegistry):
             #
             # A quick thought before the action. This seems to help with better model responses, perhaps because
             # it interleaves user with assistant messages.
-            pass # self.think("I will now think, reflect and act a bit, and then issue DONE.")        
+            pass # self.think("I will now think, reflect and act a bit, and then issue DONE.")
 
         # Aux function to perform exactly one action.
         # Occasionally, the model will return JSON missing important keys, so we just ask it to try again
         # Sometimes `content` contains EpisodicMemory's MEMORY_BLOCK_OMISSION_INFO message, which raises a TypeError on line 443
-        @repeat_on_error(retries=5, exceptions=[KeyError, TypeError])
+        @repeat_on_error(retries=5, exceptions=[KeyError, TypeError, AttributeError]) # Added AttributeError
         def aux_act_once():
             role, content = self._produce_message()
 
-            cognitive_state = content["cognitive_state"]
+            # Ensure content and its nested structures are dictionaries before accessing keys
+            if not isinstance(content, dict):
+                logger.error(f"[{self.name}] Produced message content is not a dictionary: {content}")
+                raise TypeError("Produced message content is not a dictionary.")
+
+            cognitive_state = content.get("cognitive_state")
+            if not isinstance(cognitive_state, dict):
+                logger.error(f"[{self.name}] Cognitive state in produced message is not a dictionary: {cognitive_state}")
+                raise TypeError("Cognitive state is not a dictionary.")
 
 
-            action = content['action']
-            logger.debug(f"{self.name}'s action: {action}")
+            action_data = content.get('action')
+            if not isinstance(action_data, dict):
+                logger.error(f"[{self.name}] Action data in produced message is not a dictionary: {action_data}")
+                raise TypeError("Action data is not a dictionary.")
 
-            goals = cognitive_state['goals']
-            attention = cognitive_state['attention']
-            emotions = cognitive_state['emotions']
+            logger.debug(f"{self.name}'s action: {action_data}")
 
-            self.store_in_memory({'role': role, 'content': content, 
-                                  'type': 'action', 
+            # Safely get goals, attention, and emotions
+            goals = cognitive_state.get('goals', []) # Default to empty list if not present
+            attention = cognitive_state.get('attention', None)
+            emotions = cognitive_state.get('emotions', "Feeling nothing in particular, just calm.") # Default emotion
+
+            self.store_in_memory({'role': role, 'content': content,
+                                  'type': 'action',
                                   'simulation_timestamp': self.iso_datetime()})
 
-            self._actions_buffer.append(action)
-            self._update_cognitive_state(goals=cognitive_state['goals'],
-                                        attention=cognitive_state['attention'],
-                                        emotions=cognitive_state['emotions'])
-            
-            contents.append(content)          
+            self._actions_buffer.append(action_data)
+            self._update_cognitive_state(goals=goals,
+                                        attention=attention,
+                                        emotions=emotions)
+
+            contents.append(content)
             if TinyPerson.communication_display:
                 self._display_communication(role=role, content=content, kind='action', simplified=True, max_content_length=max_content_length)
-            
+
             #
             # Some actions induce an immediate stimulus or other side-effects. We need to process them here, by means of the mental faculties.
             #
             for faculty in self._mental_faculties:
-                faculty.process_action(self, action)             
-            
+                faculty.process_action(self, action_data)
+
 
         #
         # How to proceed with a sequence of actions.
@@ -516,11 +857,21 @@ class TinyPerson(JsonSerializableRegistry):
         max_content_length=default["max_content_display_length"],
     ):
         """
-        Listens to another agent (artificial or human) and updates its internal cognitive state.
+        Processes auditory stimuli (speech) from another agent or the environment.
 
-        Args:
-            speech (str): The speech to listen to.
-            source (AgentOrWorld, optional): The source of the speech. Defaults to None.
+        This method wraps :meth:`~_observe` to specifically handle speech.
+        The stimulus is stored in episodic memory.
+
+        :param speech: The speech content to process.
+        :type speech: str
+        :param source: The source of the speech (another agent or the world).
+                       Defaults to None, indicating an unspecified or environmental source.
+        :type source: AgentOrWorld, optional
+        :param max_content_length: Max length for displaying content in communications.
+                                   Defaults to `tinytroupe.agent.default["max_content_display_length"]`.
+        :type max_content_length: int, optional
+        :return: The agent itself, to facilitate method chaining.
+        :rtype: TinyPerson
         """
 
         return self._observe(
@@ -539,11 +890,22 @@ class TinyPerson(JsonSerializableRegistry):
         max_content_length=default["max_content_display_length"],
     ):
         """
-        Perceives a social stimulus through a description and updates its internal cognitive state.
+        Processes social stimuli described textually.
 
-        Args:
-            social_description (str): The description of the social stimulus.
-            source (AgentOrWorld, optional): The source of the social stimulus. Defaults to None.
+        This method wraps :meth:`~_observe` to handle general social interactions.
+        The stimulus is stored in episodic memory.
+
+        :param social_description: A textual description of the social stimulus
+                                   (e.g., "Alice waves hello to Bob.", "A heated argument breaks out.").
+        :type social_description: str
+        :param source: The source or instigator of the social stimulus, if applicable.
+                       Defaults to None.
+        :type source: AgentOrWorld, optional
+        :param max_content_length: Max length for displaying content in communications.
+                                   Defaults to `tinytroupe.agent.default["max_content_display_length"]`.
+        :type max_content_length: int, optional
+        :return: The agent itself, to facilitate method chaining.
+        :rtype: TinyPerson
         """
         return self._observe(
             stimulus={
@@ -561,11 +923,22 @@ class TinyPerson(JsonSerializableRegistry):
         max_content_length=default["max_content_display_length"],
     ):
         """
-        Perceives a visual stimulus through a description and updates its internal cognitive state.
+        Processes visual stimuli described textually.
 
-        Args:
-            visual_description (str): The description of the visual stimulus.
-            source (AgentOrWorld, optional): The source of the visual stimulus. Defaults to None.
+        This method wraps :meth:`~_observe` for visual perceptions.
+        The stimulus is stored in episodic memory.
+
+        :param visual_description: A textual description of the visual stimulus
+                                   (e.g., "A red car drives past.", "The room is dimly lit.").
+        :type visual_description: str
+        :param source: The object or agent that is the primary focus of the visual stimulus, if applicable.
+                       Defaults to None.
+        :type source: AgentOrWorld, optional
+        :param max_content_length: Max length for displaying content in communications.
+                                   Defaults to `tinytroupe.agent.default["max_content_display_length"]`.
+        :type max_content_length: int, optional
+        :return: The agent itself, to facilitate method chaining.
+        :rtype: TinyPerson
         """
         return self._observe(
             stimulus={
@@ -578,8 +951,19 @@ class TinyPerson(JsonSerializableRegistry):
 
     def think(self, thought, max_content_length=default["max_content_display_length"]):
         """
-        Forces the agent to think about something and updates its internal cognitive state.
+        Introduces a thought directly into the agent's cognitive process.
 
+        This wraps :meth:`~_observe`, treating the thought as an internal stimulus.
+        The source of the thought is considered to be the agent itself.
+        The thought is stored in episodic memory.
+
+        :param thought: The content of the thought (e.g., "I should check my messages.").
+        :type thought: str
+        :param max_content_length: Max length for displaying content in communications.
+                                   Defaults to `tinytroupe.agent.default["max_content_display_length"]`.
+        :type max_content_length: int, optional
+        :return: The agent itself, to facilitate method chaining.
+        :rtype: TinyPerson
         """
         return self._observe(
             stimulus={
@@ -594,7 +978,21 @@ class TinyPerson(JsonSerializableRegistry):
         self, goal, max_content_length=default["max_content_display_length"]
     ):
         """
-        Internalizes a goal and updates its internal cognitive state.
+        Internalizes a new goal.
+
+        This wraps :meth:`~_observe`, treating goal formulation as an internal stimulus.
+        The source of the goal is considered to be the agent itself.
+        The goal is stored in episodic memory as a stimulus. While the agent's LLM also
+        manages goals in its `cognitive_state` during actions, this method allows for
+        explicit external or internal setting of goals.
+
+        :param goal: The description of the goal to internalize (e.g., "Find out who sent the mysterious package.").
+        :type goal: str
+        :param max_content_length: Max length for displaying content in communications.
+                                   Defaults to `tinytroupe.agent.default["max_content_display_length"]`.
+        :type max_content_length: int, optional
+        :return: The agent itself, to facilitate method chaining.
+        :rtype: TinyPerson
         """
         return self._observe(
             stimulus={
@@ -639,7 +1037,20 @@ class TinyPerson(JsonSerializableRegistry):
         max_content_length=default["max_content_display_length"],
     ):
         """
-        Convenience method that combines the `listen` and `act` methods.
+        Convenience method that combines :meth:`~listen` and :meth:`~act`.
+
+        The agent first processes the speech input and then performs a sequence of actions.
+
+        :param speech: The speech content to process.
+        :type speech: str
+        :param return_actions: Whether to return the list of action contents from `act`.
+                               Defaults to False.
+        :type return_actions: bool
+        :param max_content_length: Max length for displaying content in communications.
+                                   Defaults to `tinytroupe.agent.default["max_content_display_length"]`.
+        :type max_content_length: int, optional
+        :return: A list of action contents if `return_actions` is True, otherwise None.
+        :rtype: list, optional
         """
 
         self.listen(speech, max_content_length=max_content_length)
@@ -655,7 +1066,20 @@ class TinyPerson(JsonSerializableRegistry):
         max_content_length=default["max_content_display_length"],
     ):
         """
-        Convenience method that combines the `see` and `act` methods.
+        Convenience method that combines :meth:`~see` and :meth:`~act`.
+
+        The agent first processes the visual description and then performs a sequence of actions.
+
+        :param visual_description: A textual description of the visual stimulus.
+        :type visual_description: str
+        :param return_actions: Whether to return the list of action contents from `act`.
+                               Defaults to False.
+        :type return_actions: bool
+        :param max_content_length: Max length for displaying content in communications.
+                                   Defaults to `tinytroupe.agent.default["max_content_display_length"]`.
+        :type max_content_length: int, optional
+        :return: A list of action contents if `return_actions` is True, otherwise None.
+        :rtype: list, optional
         """
 
         self.see(visual_description, max_content_length=max_content_length)
@@ -671,48 +1095,88 @@ class TinyPerson(JsonSerializableRegistry):
         max_content_length=default["max_content_display_length"],
     ):
         """
-        Convenience method that combines the `think` and `act` methods.
+        Convenience method that combines :meth:`~think` and :meth:`~act`.
+
+        The agent first processes the thought and then performs a sequence of actions.
+
+        :param thought: The content of the thought.
+        :type thought: str
+        :param return_actions: Whether to return the list of action contents from `act`.
+                               Defaults to False.
+        :type return_actions: bool
+        :param max_content_length: Max length for displaying content in communications.
+                                   Defaults to `tinytroupe.agent.default["max_content_display_length"]`.
+        :type max_content_length: int, optional
+        :return: A list of action contents if `return_actions` is True, otherwise None.
+        :rtype: list, optional
         """
 
         self.think(thought, max_content_length=max_content_length)
         return self.act(return_actions=return_actions, max_content_length=max_content_length)
 
-    def read_documents_from_folder(self, documents_path:str):
+    def read_documents_from_folder(self, documents_path: str):
         """
-        Reads documents from a directory and loads them into the semantic memory.
+        Reads documents from a specified local directory and loads them into the agent's semantic memory
+        via :meth:`~tinytroupe.agent.memory.SemanticMemory.add_documents_path`.
+
+        This allows the agent to ground its knowledge and responses on the content of these documents.
+
+        :param documents_path: The path to the directory containing the documents.
+        :type documents_path: str
         """
         logger.info(f"Setting documents path to {documents_path} and loading documents.")
 
         self.semantic_memory.add_documents_path(documents_path)
-    
-    def read_document_from_file(self, file_path:str):
+
+    def read_document_from_file(self, file_path: str):
         """
-        Reads a document from a file and loads it into the semantic memory.
+        Reads a single document from a local file and loads it into the agent's semantic memory
+        via :meth:`~tinytroupe.agent.memory.SemanticMemory.add_document_path`.
+
+        :param file_path: The path to the document file.
+        :type file_path: str
         """
         logger.info(f"Reading document from file: {file_path}")
 
         self.semantic_memory.add_document_path(file_path)
-    
-    def read_documents_from_web(self, web_urls:list):
+
+    def read_documents_from_web(self, web_urls: list):
         """
-        Reads documents from web URLs and loads them into the semantic memory.
+        Reads documents from a list of web URLs and loads them into the agent's semantic memory
+        via :meth:`~tinytroupe.agent.memory.SemanticMemory.add_web_urls`.
+
+        :param web_urls: A list of URLs pointing to the web documents.
+        :type web_urls: list[str]
         """
         logger.info(f"Reading documents from the following web URLs: {web_urls}")
 
         self.semantic_memory.add_web_urls(web_urls)
-    
-    def read_document_from_web(self, web_url:str):
+
+    def read_document_from_web(self, web_url: str):
         """
-        Reads a document from a web URL and loads it into the semantic memory.
+        Reads a document from a single web URL and loads it into the agent's semantic memory
+        via :meth:`~tinytroupe.agent.memory.SemanticMemory.add_web_url`.
+
+        :param web_url: The URL of the web document.
+        :type web_url: str
         """
         logger.info(f"Reading document from web URL: {web_url}")
 
         self.semantic_memory.add_web_url(web_url)
-    
+
     @transactional
     def move_to(self, location, context=[]):
         """
-        Moves to a new location and updates its internal cognitive state.
+        Moves the agent to a new location and updates its `_mental_state`.
+
+        Changing location also implies a change in the environmental context.
+        The provided `context` list describes this new environmental situation.
+
+        :param location: The new location of the agent (e.g., "Town Square", "Library").
+        :type location: str
+        :param context: A list of strings describing aspects of the new location or situation.
+                        Defaults to an empty list.
+        :type context: list, optional
         """
         self._mental_state["location"] = location
 
@@ -722,13 +1186,27 @@ class TinyPerson(JsonSerializableRegistry):
     @transactional
     def change_context(self, context: list):
         """
-        Changes the context and updates its internal cognitive state.
+        Changes the agent's current environmental context in its `_mental_state`.
+
+        The context is a list of descriptive strings. This method also calls
+        :meth:`~_update_cognitive_state` to ensure the agent's internal state reflects this change.
+
+        :param context: A list of strings describing the new context (e.g., ["It is raining.", "The park is crowded."]).
+        :type context: list
         """
-        self._mental_state["context"] = {
-            "description": item for item in context
-        }
+        # The original code had a potential issue here: `{"description": item for item in context}`
+        # This would only store the last item if context had multiple items, due to dict comprehension overriding keys.
+        # Assuming the intent was to store the list of descriptions directly or a structured representation:
+        # For simplicity and to match potential original intent of having a list of context strings:
+        self._mental_state["context"] = context # Store as a list of strings
+
+        # If it was meant to be a dictionary with unique keys, the structure would need to be different, e.g.:
+        # self._mental_state["context"] = {"descriptions": context}
+        # Or if each item was a key-value pair itself, that's different too.
+        # Given the method signature `context: list`, storing it as a list seems most straightforward.
 
         self._update_cognitive_state(context=context)
+
 
     @transactional
     def make_agent_accessible(
@@ -737,13 +1215,28 @@ class TinyPerson(JsonSerializableRegistry):
         relation_description: str = "An agent I can currently interact with.",
     ):
         """
-        Makes an agent accessible to this agent.
+        Makes another agent accessible for interaction with this agent.
+
+        Updates the internal `_accessible_agents` list and the `accessible_agents`
+        field in `_mental_state`. This information is used in the system prompt
+        to inform the LLM about potential interaction partners.
+
+        :param agent: The :class:`TinyPerson` instance to make accessible.
+        :type agent: TinyPerson
+        :param relation_description: A description of the relationship with the accessible agent
+                                     (e.g., "My colleague", "A stranger I just met").
+                                     Defaults to "An agent I can currently interact with.".
+        :type relation_description: str, optional
         """
         if agent not in self._accessible_agents:
             self._accessible_agents.append(agent)
+            # Ensure mental_state["accessible_agents"] is a list
+            if not isinstance(self._mental_state.get("accessible_agents"), list):
+                self._mental_state["accessible_agents"] = []
             self._mental_state["accessible_agents"].append(
                 {"name": agent.name, "relation_description": relation_description}
             )
+            self.reset_prompt() # Prompt needs to be updated with new accessible agents
         else:
             logger.warning(
                 f"[{self.name}] Agent {agent.name} is already accessible to {self.name}."
@@ -752,10 +1245,22 @@ class TinyPerson(JsonSerializableRegistry):
     @transactional
     def make_agent_inaccessible(self, agent: Self):
         """
-        Makes an agent inaccessible to this agent.
+        Makes another agent inaccessible to this agent.
+
+        Removes the agent from `_accessible_agents` and updates `_mental_state`.
+        The agent's internal prompt is reset.
+
+        :param agent: The :class:`TinyPerson` to make inaccessible.
+        :type agent: TinyPerson
         """
         if agent in self._accessible_agents:
             self._accessible_agents.remove(agent)
+            # Update mental state by filtering out the removed agent
+            if isinstance(self._mental_state.get("accessible_agents"), list):
+                self._mental_state["accessible_agents"] = [
+                    a for a in self._mental_state["accessible_agents"] if a.get("name") != agent.name
+                ]
+            self.reset_prompt() # Prompt needs to be updated
         else:
             logger.warning(
                 f"[{self.name}] Agent {agent.name} is already inaccessible to {self.name}."
@@ -764,10 +1269,14 @@ class TinyPerson(JsonSerializableRegistry):
     @transactional
     def make_all_agents_inaccessible(self):
         """
-        Makes all agents inaccessible to this agent.
+        Makes all other agents inaccessible to this agent.
+
+        Clears `_accessible_agents` and the `accessible_agents` list in `_mental_state`.
+        The agent's internal prompt is reset.
         """
         self._accessible_agents = []
         self._mental_state["accessible_agents"] = []
+        self.reset_prompt() # Prompt needs to be updated
 
     @transactional
     def _produce_message(self):
@@ -798,7 +1307,22 @@ class TinyPerson(JsonSerializableRegistry):
         self, goals=None, context=None, attention=None, emotions=None
     ):
         """
-        Update the TinyPerson's cognitive state.
+        Updates the agent's `_mental_state` with new information.
+
+        This method is called internally after actions are performed or when major state
+        changes occur (like moving or changing context). It ensures that the datetime (if an
+        environment is present), goals, context, attention, and emotions are current.
+        It also updates `memory_context` by retrieving relevant memories for the new state
+        and then resets the agent's prompt.
+
+        :param goals: New list of goals. If None, existing goals are maintained.
+        :type goals: list, optional
+        :param context: New context description. If None, existing context is maintained.
+        :type context: list, optional
+        :param attention: New focus of attention. If None, existing attention is maintained.
+        :type attention: str, optional
+        :param emotions: New emotional state. If None, existing emotions are maintained.
+        :type emotions: str, optional
         """
 
         # Update current datetime. The passage of time is controlled by the environment, if any.
@@ -820,27 +1344,59 @@ class TinyPerson(JsonSerializableRegistry):
         # update current emotions
         if emotions is not None:
             self._mental_state["emotions"] = emotions
-        
+
         # update relevant memories for the current situation
         current_memory_context = self.retrieve_relevant_memories_for_current_context()
         self._mental_state["memory_context"] = current_memory_context
 
         self.reset_prompt()
-        
+
 
     ###########################################################
     # Memory management
     ###########################################################
-    def store_in_memory(self, value: Any) -> list:
+    def store_in_memory(self, value: Any):
+        """
+        Stores a value (typically a stimulus or action dictionary) in the agent's
+        :class:`~tinytroupe.agent.memory.EpisodicMemory`.
+
+        The `value` dictionary is expected to have 'role', 'content', 'type', and 'simulation_timestamp' keys.
+
+        :param value: The dictionary representing the memory to store.
+        :type value: Any (typically dict)
+        """
         # TODO find another smarter way to abstract episodic information into semantic memory
         # self.semantic_memory.store(value)
 
         self.episodic_memory.store(value)
 
     def optimize_memory(self):
+        """
+        Placeholder for future memory optimization routines (e.g., summarization, consolidation).
+        Currently does nothing.
+        """
         pass #TODO
 
-    def retrieve_memories(self, first_n: int, last_n: int, include_omission_info:bool=True, max_content_length:int=None) -> list:
+    def retrieve_memories(self, first_n: int, last_n: int, include_omission_info: bool = True, max_content_length: int = None) -> list:
+        """
+        Retrieves a slice of memories from :class:`~tinytroupe.agent.memory.EpisodicMemory`.
+
+        Allows fetching the first N, last N, or a combination of memories.
+        Content can be truncated for brevity.
+
+        :param first_n: Number of earliest memories to retrieve.
+        :type first_n: int
+        :param last_n: Number of latest memories to retrieve.
+        :type last_n: int
+        :param include_omission_info: Whether to include placeholder messages if memories are omitted between first_n and last_n.
+                                      Defaults to True.
+        :type include_omission_info: bool, optional
+        :param max_content_length: If provided, truncates the 'content' field of retrieved memories.
+                                   Defaults to None (no truncation).
+        :type max_content_length: int, optional
+        :return: A list of memory dictionaries.
+        :rtype: list
+        """
         episodes = self.episodic_memory.retrieve(first_n=first_n, last_n=last_n, include_omission_info=include_omission_info)
 
         if max_content_length is not None:
@@ -849,7 +1405,19 @@ class TinyPerson(JsonSerializableRegistry):
         return episodes
 
 
-    def retrieve_recent_memories(self, max_content_length:int=None) -> list:
+    def retrieve_recent_memories(self, max_content_length: int = None) -> list:
+        """
+        Retrieves recent memories from :class:`~tinytroupe.agent.memory.EpisodicMemory`
+        based on its internal recency criteria (e.g., `EpisodicMemory.RECENCY_WINDOW`).
+
+        Content can be truncated.
+
+        :param max_content_length: If provided, truncates the 'content' field of retrieved memories.
+                                   Defaults to None.
+        :type max_content_length: int, optional
+        :return: A list of recent memory dictionaries.
+        :rtype: list
+        """
         episodes = self.episodic_memory.retrieve_recent()
 
         if max_content_length is not None:
@@ -857,18 +1425,47 @@ class TinyPerson(JsonSerializableRegistry):
 
         return episodes
 
-    def retrieve_relevant_memories(self, relevance_target:str, top_k=20) -> list:
+    def retrieve_relevant_memories(self, relevance_target: str, top_k: int = 20) -> list:
+        """
+        Retrieves memories from :class:`~tinytroupe.agent.memory.SemanticMemory` that are
+        semantically relevant to a given `relevance_target` string.
+
+        Uses vector similarity search if the semantic memory is so configured.
+
+        :param relevance_target: The text to find relevant memories for.
+        :type relevance_target: str
+        :param top_k: The maximum number of relevant memories to return. Defaults to 20.
+        :type top_k: int, optional
+        :return: A list of relevant memory content (typically strings or structured data).
+        :rtype: list
+        """
         relevant = self.semantic_memory.retrieve_relevant(relevance_target, top_k=top_k)
 
         return relevant
 
-    def retrieve_relevant_memories_for_current_context(self, top_k=7) -> list:
+    def retrieve_relevant_memories_for_current_context(self, top_k: int = 7) -> list:
+        """
+        Constructs a relevance target string from the agent's current mental state
+        (context, goals, attention, emotions, recent episodic memories) and then uses
+        :meth:`~retrieve_relevant_memories` to find semantically similar memories from
+        :class:`~tinytroupe.agent.memory.SemanticMemory`.
+
+        These relevant memories are then stored in `_mental_state["memory_context"]` and
+        are used in the agent's prompt generation.
+
+        :param top_k: The maximum number of relevant memories to return for the context. Defaults to 7.
+        :type top_k: int, optional
+        :return: A list of relevant memory content.
+        :rtype: list
+        """
         # current context is composed of th recent memories, plus context, goals, attention, and emotions
-        context = self._mental_state["context"]
-        goals = self._mental_state["goals"]
-        attention = self._mental_state["attention"]
-        emotions = self._mental_state["emotions"]
-        recent_memories = "\n".join([f"  - {m['content']}"  for m in self.retrieve_memories(first_n=0, last_n=10, max_content_length=100)])
+        context_info = self._mental_state.get("context", "")
+        goals_info = self._mental_state.get("goals", [])
+        attention_info = self._mental_state.get("attention", "")
+        emotions_info = self._mental_state.get("emotions", "")
+        # Ensure recent_memories are properly formatted; handle potential non-dict items if any issue in retrieve_memories
+        recent_memories_list = self.retrieve_memories(first_n=0, last_n=10, max_content_length=100)
+        recent_memories_str = "\n".join([f"  - {m.get('content', '')}" for m in recent_memories_list if isinstance(m, dict)])
 
         # put everything together in a nice markdown string to fetch relevant memories
         target = f"""
@@ -1214,9 +1811,28 @@ class TinyPerson(JsonSerializableRegistry):
 
     def save_specification(self, path, include_mental_faculties=True, include_memory=False):
         """
-        Saves the current configuration to a JSON file.
+        Saves the current agent specification to a JSON file.
+
+        This method serializes the agent's core attributes (persona, and optionally
+        mental faculties and memory) to a JSON file. This allows the agent's state
+        to be persisted and reloaded later using :meth:`~load_specification`.
+
+        The actual attributes included depend on the `serializable_attributes` class variable
+        and the `suppress_attributes` list constructed based on the method arguments.
+
+        :param path: The file path where the JSON specification will be saved.
+        :type path: str
+        :param include_mental_faculties: Whether to include mental faculties
+                                         in the saved specification. Defaults to True.
+        :type include_mental_faculties: bool, optional
+        :param include_memory: Whether to include episodic and semantic memory
+                               in the saved specification. Defaults to False.
+        :type include_memory: bool, optional
+
+        Example:
+            >>> agent.save_specification("my_agent_spec.json", include_memory=True)
         """
-        
+
         suppress_attributes = []
 
         # should we include the memory?
@@ -1235,12 +1851,42 @@ class TinyPerson(JsonSerializableRegistry):
     @staticmethod
     def load_specification(path_or_dict, suppress_mental_faculties=False, suppress_memory=False, auto_rename_agent=False, new_agent_name=None):
         """
-        Loads a JSON agent specification.
+        Loads an agent specification from a JSON file or a dictionary.
 
-        Args:
-            path_or_dict (str or dict): The path to the JSON file or the dictionary itself.
-            suppress_mental_faculties (bool, optional): Whether to suppress loading the mental faculties. Defaults to False.
-            suppress_memory (bool, optional): Whether to suppress loading the memory. Defaults to False.
+        This static method deserializes an agent's specification and creates a new
+        :class:`TinyPerson` instance. It handles attribute suppression (e.g., not loading
+        memory or faculties if desired) and agent renaming to avoid conflicts if
+        `auto_rename_agent` or `new_agent_name` is used.
+
+        The agent is registered in the global `TinyPerson.all_agents` list unless
+        renaming fails due to persistent name collision (if `auto_rename_agent` is False
+        and name exists).
+
+        :param path_or_dict: The path to the JSON specification file or a dictionary
+                             containing the specification.
+        :type path_or_dict: str or dict
+        :param suppress_mental_faculties: Whether to prevent loading
+                                          mental faculties from the specification. Defaults to False.
+        :type suppress_mental_faculties: bool, optional
+        :param suppress_memory: Whether to prevent loading episodic and
+                                semantic memory from the specification. Defaults to False.
+        :type suppress_memory: bool, optional
+        :param auto_rename_agent: If True and the agent name from the specification
+                                  is already in use, automatically generates a new unique name
+                                  (e.g., "AgentName_XXXX"). Defaults to False.
+        :type auto_rename_agent: bool, optional
+        :param new_agent_name: A specific new name to assign to the loaded agent,
+                               overriding the name in the specification. If this name is
+                               already in use, loading will fail unless `auto_rename_agent` is also True.
+                               Defaults to None.
+        :type new_agent_name: str, optional
+        :return: A new :class:`TinyPerson` instance loaded from the specification.
+        :rtype: TinyPerson
+
+        Example:
+            >>> loaded_agent = TinyPerson.load_specification("my_agent_spec.json")
+            >>> print(f"Loaded agent: {loaded_agent.name}")
+            >>> another_agent = TinyPerson.load_specification("my_agent_spec.json", new_agent_name="Agent_Clone")
         """
 
         suppress_attributes = []

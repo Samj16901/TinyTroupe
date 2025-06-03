@@ -474,6 +474,36 @@ LLM API caching, when enabled, works at a lower and simpler level than simulatio
 
 The `config.ini` file contains various parameters that can be used to customize the behavior of the library, such as model parameters and logging level. Please pay special attention to `API_TYPE` parameter, which defines whether you are using the Azure OpenAI Service or the OpenAI API. We provide an example of a `config.ini` file, [./examples/config.ini](./examples/config.ini), which you can use as a template for your own, or just modify to run the examples.
 
+## Command-Line Interface (CLI) Tool
+
+This repository includes a basic command-line tool, `run_chat_cli.py`, located in the `examples` directory, to quickly run chat simulations between two agents without needing to write Python code directly.
+
+### Usage
+
+**1. List Available Agents:**
+
+To see a list of predefined agent personas available in the `examples/agents/` directory:
+
+```bash
+python examples/run_chat_cli.py --list_agents
+```
+
+**2. Run a Chat Simulation:**
+
+To run a simulation, you need to specify two agents, an initial prompt for the first agent, and optionally the number of simulation steps.
+
+```bash
+python examples/run_chat_cli.py --agent1 <Agent1Name> --agent2 <Agent2Name> --prompt "Your starting message for Agent1" --steps <NumberOfSteps>
+```
+
+**Example:**
+
+```bash
+python examples/run_chat_cli.py --agent1 Lisa --agent2 Oscar --prompt "Hi Oscar, what are you working on these days?" --steps 4
+```
+
+**Note:** Running simulations requires a valid OpenAI API key to be configured in your environment, as the agents use OpenAI models for generating responses. If the API key is not set up, the script will likely fail when attempting to make LLM calls.
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a

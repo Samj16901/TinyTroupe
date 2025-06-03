@@ -17,7 +17,96 @@ AgentOrWorld = Union["TinyPerson", "TinyWorld"]
 
 class TinyWorld:
     """
-    Base class for environments.
+    Manages the simulation environment, including agents, time, and interactions.
+
+    A `TinyWorld` instance is the main container for a simulation. It holds a collection
+    of :class:`~tinytroupe.agent.tiny_person.TinyPerson` agents, tracks the simulated
+    date and time, and orchestrates the simulation flow. The world processes agent actions,
+    handles communication between agents, and can apply :class:`~tinytroupe.steering.intervention.Intervention`
+    objects to influence the simulation's course.
+
+    **Core Concepts:**
+
+    *   **Simulation Steps**: The simulation progresses in discrete steps. In each step,
+        time can advance, interventions are checked, and agents perform actions.
+    *   **Time Management**: The world maintains a `current_datetime`. Methods like
+        :meth:`~run`, :meth:`~run_minutes`, :meth:`~run_days`, etc., advance this time.
+    *   **Agent Interaction**: The world facilitates agent interactions by handling actions
+        like "TALK" and "REACH_OUT". It can broadcast messages to all agents or
+        deliver them to specific targets.
+    *   **Extensibility**: While `TinyWorld` provides a general simulation framework,
+        it can be subclassed to create environments with specific rules, physics, or
+        interaction models (e.g., :class:`~TinySocialNetwork`).
+
+    :param name: The name of the environment.
+    :type name: str, optional
+    :param agents: A list of :class:`~tinytroupe.agent.tiny_person.TinyPerson` instances to add initially.
+                   Defaults to an empty list.
+    :type agents: list, optional
+    :param initial_datetime: The starting date and time for the simulation.
+                             Defaults to the current real-world datetime.
+    :type initial_datetime: datetime, optional
+    :param interventions: A list of :class:`~tinytroupe.steering.intervention.Intervention` objects
+                          to be applied during the simulation. Defaults to an empty list.
+    :type interventions: list, optional
+    :param broadcast_if_no_target: If True, actions from agents that do not specify a target
+                                   will be broadcast to all other agents in the environment.
+                                   Defaults to True.
+    :type broadcast_if_no_target: bool, optional
+    :param max_additional_targets_to_display: When an action is broadcast to multiple targets,
+                                              this limits how many target names are explicitly shown
+                                              in the communication display. If None, all targets are displayed.
+                                              Defaults to 3.
+    :type max_additional_targets_to_display: int, optional
+
+    **Attributes:**
+
+    *   ``name (str)``: Name of the environment.
+    *   ``agents (list)``: List of :class:`~tinytroupe.agent.tiny_person.TinyPerson` agents in this world.
+    *   ``name_to_agent (dict)``: Mapping from agent names to agent instances for quick lookup.
+    *   ``current_datetime (datetime)``: Current simulated time.
+    *   ``broadcast_if_no_target (bool)``: Controls broadcasting of untargeted actions.
+    *   ``_interventions (list)``: List of :class:`~tinytroupe.steering.intervention.Intervention` objects.
+    *   ``simulation_id (str)``: Identifier for the simulation scope, if part of a larger experiment.
+
+    **Basic Usage Example:**
+    **Basic Usage Example:**
+
+    .. code-block:: python
+
+        from tinytroupe.agent import TinyPerson
+        from tinytroupe.environment import TinyWorld
+        from datetime import datetime, timedelta
+
+        # 1. Create a world
+        world = TinyWorld(name="Tutorial World", initial_datetime=datetime(2025, 1, 1, 9, 0, 0))
+
+        # 2. Create and add agents
+        alice = TinyPerson(name="Alice")
+        alice.define("occupation", {"title": "Botanist"})
+        alice.internalize_goal("Prepare for the annual flower show.")
+
+        bob = TinyPerson(name="Bob")
+        bob.define("occupation", {"title": "Baker"})
+        bob.internalize_goal("Invent a new croissant recipe by next week.")
+
+        world.add_agents([alice, bob])
+        world.make_everyone_accessible() # Allow Alice and Bob to interact
+
+        # 3. Run the simulation
+        print(f"Starting simulation at: {world.current_datetime}")
+        world.run(steps=2, timedelta_per_step=timedelta(hours=1))
+        # Simulation output will show Alice and Bob acting...
+
+        # 4. Broadcast a message
+        world.broadcast("A sudden announcement: The town festival is moved to tomorrow!", source=world)
+        world.run(steps=1, timedelta_per_step=timedelta(minutes=30)) # See how they react
+
+        print(f"Ending simulation at: {world.current_datetime}")
+        # Example output:
+        # Starting simulation at: 2025-01-01 09:00:00
+        # ... (simulation logs) ...
+        # Ending simulation at: 2025-01-01 11:30:00
     """
 
     # A dict of all environments created so far.
@@ -32,17 +121,20 @@ class TinyWorld:
                  broadcast_if_no_target=True,
                  max_additional_targets_to_display=3):
         """
-        Initializes an environment.
+        Initializes a TinyWorld environment.
 
-        Args:
-            name (str): The name of the environment.
-            agents (list): A list of agents to add to the environment.
-            initial_datetime (datetime): The initial datetime of the environment, or None (i.e., explicit time is optional). 
-                Defaults to the current datetime in the real world.
-            interventions (list): A list of interventions to apply in the environment at each simulation step.
-            broadcast_if_no_target (bool): If True, broadcast actions if the target of an action is not found.
-            max_additional_targets_to_display (int): The maximum number of additional targets to display in a communication. If None, 
-                all additional targets are displayed.
+        :param name: The name of the environment.
+        :type name: str, optional
+        :param agents: A list of :class:`~tinytroupe.agent.tiny_person.TinyPerson` instances to add initially.
+        :type agents: list, optional
+        :param initial_datetime: The starting date and time for the simulation.
+        :type initial_datetime: datetime, optional
+        :param interventions: A list of :class:`~tinytroupe.steering.intervention.Intervention` objects.
+        :type interventions: list, optional
+        :param broadcast_if_no_target: If True, untargeted actions are broadcast.
+        :type broadcast_if_no_target: bool, optional
+        :param max_additional_targets_to_display: Limits display of broadcast targets.
+        :type max_additional_targets_to_display: int, optional
         """
 
         self.name = name
@@ -76,10 +168,23 @@ class TinyWorld:
     @transactional
     def _step(self, timedelta_per_step=None):
         """
-        Performs a single step in the environment. This default implementation
-        simply calls makes all agents in the environment act and properly
-        handle the resulting actions. Subclasses might override this method to implement 
-        different policies.
+        Performs a single simulation step in the environment.
+
+        A step typically involves:
+        1.  Advancing the simulation `current_datetime` (if `timedelta_per_step` is provided).
+        2.  Checking and applying any active :class:`~tinytroupe.steering.intervention.Intervention` objects.
+        3.  Allowing each agent in the world to :meth:`~tinytroupe.agent.tiny_person.TinyPerson.act`.
+        4.  Handling the actions generated by agents via :meth:`~_handle_actions`.
+
+        Subclasses can override this method to implement custom step logic,
+        for example, by introducing environmental events or physics.
+
+        :param timedelta_per_step: The amount of simulated time to advance after this step.
+                                   If None, the environment's time does not change.
+        :type timedelta_per_step: timedelta, optional
+        :return: A dictionary where keys are agent names and values are lists of raw action
+                 content dictionaries performed by that agent during this step.
+        :rtype: dict
         """
         # increase current datetime if timedelta is given. This must happen before
         # any other simulation updates, to make sure that the agents are acting
@@ -123,16 +228,34 @@ class TinyWorld:
     @transactional
     def run(self, steps: int, timedelta_per_step=None, return_actions=False):
         """
-        Runs the environment for a given number of steps.
+        Runs the simulation for a specified number of steps.
 
-        Args:
-            steps (int): The number of steps to run the environment for.
-            timedelta_per_step (timedelta, optional): The time interval between steps. Defaults to None.
-            return_actions (bool, optional): If True, returns the actions taken by the agents. Defaults to False.
-        
-        Returns:
-            list: A list of actions taken by the agents over time, if return_actions is True. The list has this format:
-                  [{agent_name: [action_1, action_2, ...]}, {agent_name_2: [action_1, action_2, ...]}, ...]
+        In each step, the simulation time is advanced by `timedelta_per_step` (if provided),
+        interventions are processed, and all agents are allowed to act by calling the
+        internal :meth:`~_step` method.
+
+        :param steps: The number of simulation steps to run.
+        :type steps: int
+        :param timedelta_per_step: The duration of simulated time that passes in each step.
+                                   If None, time does not advance. Defaults to None.
+        :type timedelta_per_step: timedelta, optional
+        :param return_actions: If True, a list containing the actions taken by agents in
+                               each step is returned. Defaults to False.
+        :type return_actions: bool, optional
+        :return: If `return_actions` is True, returns a list of dictionaries.
+                 Each dictionary corresponds to a step and maps agent names
+                 to the list of raw action content dictionaries they performed in that step.
+                 Otherwise, returns None.
+        :rtype: list, optional
+
+        Example:
+            >>> # Run for 3 steps, each step representing 15 minutes
+            >>> actions_over_3_steps = world.run(steps=3, timedelta_per_step=timedelta(minutes=15), return_actions=True)
+            >>> if actions_over_3_steps:
+            ...     for step_num, step_actions in enumerate(actions_over_3_steps):
+            ...         print(f"Actions in step {step_num + 1}:")
+            ...         for agent_name, actions in step_actions.items():
+            ...             print(f"  {agent_name} took {len(actions)} actions.")
         """
         agents_actions_over_time = []
         for i in range(steps):
@@ -272,25 +395,33 @@ class TinyWorld:
     #######################################################################
     def add_agents(self, agents: list):
         """
-        Adds a list of agents to the environment.
+        Adds multiple :class:`~tinytroupe.agent.tiny_person.TinyPerson` instances to the environment.
 
-        Args:
-            agents (list): A list of agents to add to the environment.
+        Each agent is added using the :meth:`~add_agent` method.
+
+        :param agents: A list of `TinyPerson` instances to add.
+        :type agents: list
+        :return: The environment instance, allowing for method chaining.
+        :rtype: TinyWorld
         """
         for agent in agents:
             self.add_agent(agent)
-        
+
         return self # for chaining
 
     def add_agent(self, agent: TinyPerson):
         """
-        Adds an agent to the environment. The agent must have a unique name within the environment.
+        Adds a single :class:`~tinytroupe.agent.tiny_person.TinyPerson` to the environment.
 
-        Args:
-            agent (TinyPerson): The agent to add to the environment.
-        
-        Raises:
-            ValueError: If the agent name is not unique within the environment.
+        The agent's name must be unique within this environment. The agent's `environment`
+        attribute will be set to this `TinyWorld` instance, linking the agent to this world.
+        The agent is also added to the `agents` list and `name_to_agent` dictionary.
+
+        :param agent: The `TinyPerson` instance to add.
+        :type agent: TinyPerson
+        :return: The environment instance, allowing for method chaining.
+        :rtype: TinyWorld
+        :raises ValueError: If an agent with the same name already exists in the environment.
         """
 
         # check if the agent is not already in the environment
@@ -312,10 +443,13 @@ class TinyWorld:
 
     def remove_agent(self, agent: TinyPerson):
         """
-        Removes an agent from the environment.
+        Removes a specific agent from the environment.
 
         Args:
-            agent (TinyPerson): The agent to remove from the environment.
+            agent (TinyPerson): The `TinyPerson` instance to remove.
+
+        Returns:
+            TinyWorld: The environment instance, allowing for method chaining.
         """
         logger.debug(f"Removing agent {agent.name} from the environment.")
         self.agents.remove(agent)
@@ -325,7 +459,10 @@ class TinyWorld:
     
     def remove_all_agents(self):
         """
-        Removes all agents from the environment.
+        Removes all agents currently in the environment.
+
+        Returns:
+            TinyWorld: The environment instance, allowing for method chaining.
         """
         logger.debug(f"Removing all agents from the environment.")
         self.agents = []
@@ -335,14 +472,12 @@ class TinyWorld:
 
     def get_agent_by_name(self, name: str) -> TinyPerson:
         """
-        Returns the agent with the specified name. If no agent with that name exists in the environment, 
-        returns None.
+        Retrieves an agent from the environment by its name.
 
-        Args:
-            name (str): The name of the agent to return.
-
-        Returns:
-            TinyPerson: The agent with the specified name.
+        :param name: The name of the agent to retrieve.
+        :type name: str
+        :return: The :class:`~tinytroupe.agent.tiny_person.TinyPerson` instance if found, otherwise None.
+        :rtype: TinyPerson, optional
         """
         if name in self.name_to_agent:
             return self.name_to_agent[name]
@@ -371,13 +506,18 @@ class TinyWorld:
     @transactional
     def _handle_actions(self, source: TinyPerson, actions: list):
         """ 
-        Handles the actions issued by the agents.
+        Handles actions performed by a source agent.
 
-        Args:
-            source (TinyPerson): The agent that issued the actions.
-            actions (list): A list of actions issued by the agents. Each action is actually a
-              JSON specification.
-            
+        This method is called by :meth:`~_step` after an agent acts. It iterates through
+        the list of actions and calls specific handlers (e.g., :meth:`~_handle_talk`,
+        :meth:`~_handle_reach_out`) based on the action type.
+        This is the primary mechanism by which agent actions affect the environment or other agents.
+
+        :param source: The :class:`~tinytroupe.agent.tiny_person.TinyPerson` that performed the actions.
+        :type source: TinyPerson
+        :param actions: A list of action dictionaries produced by the `source` agent.
+                        Each dictionary should have a "type" field, and optionally "content" and "target".
+        :type actions: list
         """
         for action in actions:
             action_type = action["type"] # this is the only required field
@@ -395,13 +535,22 @@ class TinyWorld:
     @transactional
     def _handle_reach_out(self, source_agent: TinyPerson, content: str, target: str):
         """
-        Handles the REACH_OUT action. This default implementation always allows REACH_OUT to succeed.
-        Subclasses might override this method to implement different policies.
+        Handles the "REACH_OUT" action.
 
-        Args:
-            source_agent (TinyPerson): The agent that issued the REACH_OUT action.
-            content (str): The content of the message.
-            target (str): The target of the message.
+        This default implementation attempts to make the `source_agent` and `target` agent
+        mutually accessible by calling :meth:`~tinytroupe.agent.tiny_person.TinyPerson.make_agent_accessible`
+        on both. It then informs both agents via a social stimulus about the successful connection.
+        If the target agent is not found, a debug message is logged.
+
+        Subclasses might override this to implement different policies for reachability
+        (e.g., based on distance, social status, or environmental barriers).
+
+        :param source_agent: The agent that issued the "REACH_OUT" action.
+        :type source_agent: TinyPerson
+        :param content: The content associated with the reach out action (e.g., an introductory message, though not explicitly used in this handler).
+        :type content: str
+        :param target: The name of the agent to reach out to.
+        :type target: str
         """
 
         # This default implementation always allows REACH_OUT to suceed.
@@ -413,19 +562,25 @@ class TinyWorld:
 
             source_agent.socialize(f"{name_or_empty(target_agent)} was successfully reached out, and is now available for interaction.", source=self)
             target_agent.socialize(f"{name_or_empty(source_agent)} reached out to you, and is now available for interaction.", source=self)
-        
+
         else:
             logger.debug(f"[{self.name}] REACH_OUT action failed: target agent '{target}' not found.")
 
     @transactional
     def _handle_talk(self, source_agent: TinyPerson, content: str, target: str):
         """
-        Handles the TALK action by delivering the specified content to the specified target.
+        Handles the "TALK" action by delivering the speech content to the target agent.
 
-        Args:
-            source_agent (TinyPerson): The agent that issued the TALK action.
-            content (str): The content of the message.
-            target (str, optional): The target of the message.
+        If `target` is a valid agent name in the world, that agent :meth:`~tinytroupe.agent.tiny_person.TinyPerson.listen`s
+        to the `content`. If `target` is not found and `broadcast_if_no_target` is True,
+        the message is broadcast to all other agents in the world via :meth:`~broadcast`.
+
+        :param source_agent: The agent that performed the "TALK" action.
+        :type source_agent: TinyPerson
+        :param content: The speech content of the talk action.
+        :type content: str
+        :param target: The name of the target agent. Can be None or empty for a broadcast (if enabled).
+        :type target: str, optional
         """
         target_agent = self.get_agent_by_name(target)
 
@@ -440,13 +595,18 @@ class TinyWorld:
     # Interaction methods
     #######################################################################
     @transactional
-    def broadcast(self, speech: str, source: AgentOrWorld=None):
+    def broadcast(self, speech: str, source: AgentOrWorld = None):
         """
-        Delivers a speech to all agents in the environment.
+        Delivers a speech (auditory stimulus) to all agents in the environment,
+        except for the `source` of the speech.
 
-        Args:
-            speech (str): The content of the message.
-            source (AgentOrWorld, optional): The agent or environment that issued the message. Defaults to None.
+        Each agent receives the speech via its :meth:`~tinytroupe.agent.tiny_person.TinyPerson.listen` method.
+
+        :param speech: The content of the speech to broadcast.
+        :type speech: str
+        :param source: The agent or world entity that is the source of this speech.
+                       Agents will not listen to their own broadcasts. Defaults to None (world itself).
+        :type source: AgentOrWorld, optional
         """
         logger.debug(f"[{self.name}] Broadcasting message: '{speech}'.")
 
@@ -454,40 +614,53 @@ class TinyWorld:
             # do not deliver the message to the source
             if agent != source:
                 agent.listen(speech, source=source)
-    
+
     @transactional
-    def broadcast_thought(self, thought: str, source: AgentOrWorld=None):
+    def broadcast_thought(self, thought: str, source: AgentOrWorld = None):
         """
         Broadcasts a thought to all agents in the environment.
 
-        Args:
-            thought (str): The content of the thought.
+        Each agent will process this as an internal thought via its
+        :meth:`~tinytroupe.agent.tiny_person.TinyPerson.think` method.
+
+        :param thought: The content of the thought to broadcast.
+        :type thought: str
+        :param source: The originator of this broadcast thought. This argument is
+                       currently not used directly by the agent's `think` method's default
+                       stimulus generation but is kept for API consistency. Defaults to None.
+        :type source: AgentOrWorld, optional
         """
         logger.debug(f"[{self.name}] Broadcasting thought: '{thought}'.")
 
         for agent in self.agents:
             agent.think(thought)
-    
+
     @transactional
     def broadcast_internal_goal(self, internal_goal: str):
         """
         Broadcasts an internal goal to all agents in the environment.
 
-        Args:
-            internal_goal (str): The content of the internal goal.
+        Each agent will internalize this goal via its
+        :meth:`~tinytroupe.agent.tiny_person.TinyPerson.internalize_goal` method.
+
+        :param internal_goal: The description of the goal to broadcast.
+        :type internal_goal: str
         """
         logger.debug(f"[{self.name}] Broadcasting internal goal: '{internal_goal}'.")
 
         for agent in self.agents:
             agent.internalize_goal(internal_goal)
-    
-    @transactional
-    def broadcast_context_change(self, context:list):
-        """
-        Broadcasts a context change to all agents in the environment.
 
-        Args:
-            context (list): The content of the context change.
+    @transactional
+    def broadcast_context_change(self, context: list):
+        """
+        Broadcasts a change in the environmental context to all agents.
+
+        Each agent updates its context via its
+        :meth:`~tinytroupe.agent.tiny_person.TinyPerson.change_context` method.
+
+        :param context: A list of strings describing the new context.
+        :type context: list
         """
         logger.debug(f"[{self.name}] Broadcasting context change: '{context}'.")
 
@@ -496,13 +669,17 @@ class TinyWorld:
 
     def make_everyone_accessible(self):
         """
-        Makes all agents in the environment accessible to each other.
+        Makes all agents within this environment mutually accessible to each other.
+
+        This calls :meth:`~tinytroupe.agent.tiny_person.TinyPerson.make_agent_accessible`
+        for every pair of distinct agents in the world. This is a convenient way to
+        set up an environment where all agents can potentially interact from the start.
         """
         for agent_1 in self.agents:
             for agent_2 in self.agents:
                 if agent_1 != agent_2:
                     agent_1.make_agent_accessible(agent_2)
-            
+
 
     ###########################################################
     # Formatting conveniences
